@@ -1,0 +1,42 @@
+package luPackage;
+
+{$R *.res}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO ON}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST ON}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DESCRIPTION 'Luis Net components'}
+{$IMPLICITBUILD OFF}
+
+requires
+  vcl;
+
+contains
+  LULM in 'LULM.pas',
+  LMServer in 'LM\LMServer.pas',
+  LMCons in 'LM\LMCons.pas',
+  LmErrText in 'LM\LMErrText.pas',
+  LMErrLU in 'LM\LmErrLU.pas',
+  LMAPIbuf in 'LM\LMAPIbuf.pas',
+  LUSI in 'LUSI.pas',
+  LMAccess in 'LM\LMaccess.pas',
+  LUWNet in 'LUWNet.pas';
+
+end.

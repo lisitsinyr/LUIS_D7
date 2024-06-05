@@ -1,0 +1,6 @@
+++ NEW IN VERSION 1.0.1 ++
+* Delphi 5 and 7 version added
+
+++ NEW IN VERSION 1.0.2 ++
+* Bug for Delphi 7 corrected
+

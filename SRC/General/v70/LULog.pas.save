@@ -1,0 +1,427 @@
+{=======================================================}
+{ Project:                                              }
+{         Delphi VCL Extensions (LU)                    }
+{         Copyright (c) 2000 Central Bank Of Russia     }
+{ Subject:                                              }
+{         Журнал                                        }
+{ Author:                                               }
+{         Lisitsin Y.R.                                 }
+{=======================================================}
+
+unit LULog;
+
+interface
+
+uses
+   SysUtils, StrUtils, Windows, Classes, StdCtrls, Controls, FileCtrl,
+   LUSupport;
+
+type
+  TTypeLogString = (tlsBegin, tlsEnd, tlsInfo, tlsError, tlsWarning, tlsProcess);
+  TTypeLogCODE = (tlcOEM, tlcANSI);
+
+type
+  TFileMemoLog = class(TComponent)
+  private
+    { Private declarations }
+    FCountLogStrings: Integer;
+    FFileName: PChar;
+    FStandardOut: Boolean;
+    FLogCODE: TTypeLogCODE;
+    FLogEnabled: boolean;
+    FTruncateDays: integer;
+    FLogStringOEM: PChar;
+    FLogStringAnsi: PChar;
+    FMemoLog : TMemo;
+    FLogStrings: TStringList;
+    FLogSave: TStringList;
+  protected
+    { Protected declarations }
+    procedure Execute(T: TTypeLogString);
+    procedure SetLogString(T: TTypeLogString; TabCount: Integer; Value: String);
+    procedure SetMemoLog(Value: TMemo);
+    procedure TruncateMemo(ATS: TStrings);
+    function LogTypeStr(T: TTypeLogString) : string;
+    function GetLogSave(Filename: string): TStringList;
+    function GetLogSaveCurrent: TStringList;
+    function GetFileName: string;
+    procedure SetFileName(const Value: string);
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    procedure TruncateLog;
+    procedure AddFile(const FileName: string; TabCount: Integer);
+    property LogString[T: TTypeLogString; TabCount: Integer]: string write SetLogString;
+    property LogSave[Filename: string]: TStringList read GetLogSave;
+    property LogSaveCurrent: TStringList read GetLogSaveCurrent;
+  published
+    { Published declarations }
+    property NumberOfLogStrings: integer read FCountLogStrings write FCountLogStrings;
+    property LogEnabled: boolean read FLogEnabled write FLogEnabled;
+    property FileName: string read GetFileName write SetFileName;
+    property TruncateDays: integer read FTruncateDays write FTruncateDays;
+    property MemoLog: TMemo read FMemoLog write SetMemoLog;
+    property StandardOut: Boolean read FStandardOut write FStandardOut;
+    property LogCODE: TTypeLogCODE read FLogCODE write FLogCODE;
+  end;
+
+type
+  TLogOutput = (loStandard, loTextFile);
+  TLogOutputs = set of TLogOutput;
+
+var
+   APPLog: TFileMemoLog;
+
+function GetLogFileName: string;
+function GetLogFileNameSufix(const Sufix: string): string;
+
+procedure Register;
+
+implementation
+
+uses
+   LULogView;
+
+const
+   StlsInfo    = 'I';
+   StlsError   = 'E';
+   StlsWarning = 'W';
+   StlsBegin   = '>';
+   StlsEnd     = '<';
+   StlsProcess = 'P';
+
+function GetLogFileName: string;
+begin
+   Result := FormatDateTime('yyyymmdd', Now)+'.log';
+end;
+
+function GetLogFileNameSufix(const Sufix: string): string;
+begin
+   Result := FormatDateTime('yyyymmdd', Now)+Sufix+'.log';
+end;
+
+function LogDateStr(TimeOnly: Boolean) : string;
+var
+   Today : TDateTime;
+   hh,nn,ss,ms: word;
+   s : string;
+begin
+   Today := Now;
+   DecodeTime(Today,hh,nn,ss,ms);
+   s := AddChar('0',IntToStr(ms),3)+' ';
+   if TimeOnly then
+      Result := FormatDateTime('               hh:mm:ss '+s,Today)
+   else
+      Result := FormatDateTime('dd"/"mm"/"yyyy hh:mm:ss '+s,Today);
+end;
+
+constructor TFileMemoLog.Create(AOwner: TComponent);
+begin
+   inherited Create(AOwner);
+   FMemoLog := nil;
+   FCountLogStrings := 200;
+   FStandardOut := False;
+   FTruncateDays := 3;
+   FLogEnabled := True;
+   FLogCODE := tlcOEM;
+   FLogStrings := TStringList.Create;
+   FLogSave := TStringList.Create;
+   FLogStringOEM := nil;
+   FLogStringAnsi := nil;
+   FileName := '';
+end;
+
+destructor TFileMemoLog.Destroy;
+begin
+   StrDispose(FLogStringOEM);
+   StrDispose(FLogStringAnsi);
+   StrDispose(FFileName);
+   FLogStrings.Free;
+   FLogSave.Free;
+   inherited Destroy;
+end;
+
+function TFileMemoLog.GetFileName: string;
+begin
+   Result := StrPas(FFileName);
+end;
+procedure TFileMemoLog.SetFileName(const Value: string);
+begin
+   if FFileName <> nil then StrDispose(FFileName);
+   FFileName := StrAlloc(Length(Value)+1);
+   StrPCopy(FFileName, Value);
+   if (FileName <> '') and FileExists(FileName) then begin
+      try
+         FMemoLog.Lines.LoadFromFile(FileName);
+      except
+      end;
+   end;
+end;
+
+function TFileMemoLog.LogTypeStr(T: TTypeLogString) : string;
+begin
+   Result := ' ';
+   case T of
+      tlsInfo: Result  := StlsInfo;
+      tlsError: Result := StlsError;
+      tlsWarning: Result := StlsWarning;
+      tlsBegin: Result := StlsBegin;
+      tlsEnd: Result := StlsEnd;
+      tlsProcess: Result := StlsProcess;
+   end;
+   Result := Result + ' ';
+end;
+
+procedure TFileMemoLog.SetMemoLog(Value: TMemo);
+begin
+   FMemoLog := Value;
+   if FMemoLog <> nil then begin
+      with FMemoLog do begin
+         Clear;
+         Align := alClient;
+         ReadOnly := True;
+         TabStop := False;
+         WantReturns := False;
+         WantTabs := False;
+         WordWrap := False;
+         ParentColor := True;
+         ScrollBars := ssVertical;
+         ScrollBars := ssBoth;
+      end;
+      if (FileName <> '') and FileExists(FileName) then begin
+         try
+            FMemoLog.Lines.LoadFromFile(FileName);
+         except
+         end;
+      end;
+   end;
+end;
+
+procedure TFileMemoLog.SetLogString (T: TTypeLogString; TabCount: Integer; Value: string);
+var
+   s: string;
+begin
+   s := StringOfChar(' ', TabCount*2)+Value;
+
+   if FLogStringOEM <> nil then StrDispose(FLogStringOEM);
+   FLogStringOEM := StrAlloc(Length(s)+1);
+   StrPCopy(FLogStringOEM, s);
+
+   if FLogStringANSI <> nil then StrDispose(FLogStringANSI);
+   FLogStringANSI := StrAlloc(Length(s)+1);
+   StrPCopy(FLogStringANSI, s);
+
+   case FLogCODE of
+      tlcOEM:  CharToOEM(FLogStringANSI, FLogStringANSI);
+      tlcANSI: OEMtoChar(FLogStringOEM, FLogStringOEM);
+   end;
+   if LogEnabled then Execute(T);
+end;
+
+procedure TFileMemoLog.Execute(T: TTypeLogString);
+var
+   F: TextFile;
+   i: Integer;
+   s: string;
+begin
+   { StandardOut }
+   if StandardOut and isConsole then begin
+      FLogStrings.SetText(FLogStringANSI);
+      for i:=0 to FLogStrings.Count-1 do begin
+         System.WriteLn (LogDateStr(False)+LogTypeStr(T)+FLogStrings.Strings[i]);
+      end;
+   end;
+
+   { Filename }
+   if FileName <> '' then begin
+      s := ExtractFileDir(ExpandFileName(FileName));
+      if s <> '' then if not DirectoryExists(s) then ForceDirectories (s);
+      FLogStrings.SetText(FLogStringOEM);
+      if not FileExists(FileName) then FileClose(FileCreate(FileName));
+      AssignFile(F, FileName);
+      System.Append (F);
+      for i:=0 to FLogStrings.Count-1 do begin
+         System.WriteLn (F, LogDateStr(False)+LogTypeStr(T)+FLogStrings.Strings[i]);
+      end;
+      Flush(F);
+      CloseFile (F);
+   end;
+
+   { Memo }
+   if FMemoLog <> nil then begin
+      FLogStrings.SetText(FLogStringOEM);
+      for i:=0 to FLogStrings.Count-1 do begin
+         FMemoLog.Lines.Add(LogDateStr(False)+LogTypeStr(T)+FLogStrings.Strings[i]);
+      end;
+   end;
+end;
+
+procedure TFileMemoLog.TruncateMemo(ATS: TStrings);
+var
+   Today, LogDay: TDateTime;
+   //Delta: TDateTime;
+   s : string;
+   Save : Char;
+   i : Longint;
+   x : Longint;
+   Stop : Boolean;
+   yy,mm,dd,hh,nn,ss,ms: word;
+begin
+   Save := DateSeparator;
+   DateSeparator := '/';
+   Today := Now;
+   s := DateTimeToStr(Today);
+   i := 0;
+   Stop := False;
+   while (i < ATS.Count) and (not Stop) do begin
+      s := ExtractWordNew (1, ats.Strings[i], [' ']) + ' ' +
+           ExtractWordNew (2, ats.Strings[i], [' ']);
+      s := ReplaceStr(s, '.', DateSeparator);
+      try
+         ms := StrToInt(ExtractWordNew (2, ats.Strings[i], [' ']));
+      except
+         ms := 0;
+      end;
+      try
+         LogDay := StrToDateTime(s)+EncodeTime(0,0,0,ms);
+      except
+         LogDay := 0;
+      end;
+      if LogDay <> 0 then begin
+         DecodeDate(Today-TruncateDays,yy,mm,dd);
+         DecodeTime(Today-TruncateDays,hh,nn,ss,ms);
+         //Delta := EncodeDate(yy,mm,dd)+EncodeTime(hh,nn,ss,ms);
+         x := Trunc(Today)-Trunc(LogDay);
+         if x > TruncateDays-1 then
+//         if LogDay < Delta then
+            ats.Delete(i)
+         else begin
+            Stop := True;
+            i := ats.Count;
+         end;
+         end
+      else begin
+         ats.Delete(i);
+      end;
+   end;
+   DateSeparator := Save;
+end;
+
+procedure TFileMemoLog.TruncateLog;
+var
+   ts : TStringList;
+begin
+   ts := TStringList.Create;
+   ts.Sorted := False;
+   ts.Duplicates := dupAccept;
+
+   { Filename }
+   if FileExists(FileName) then begin
+      ts.Clear;
+      try
+         ts.LoadFromFile(FileName);
+      except
+      end;
+      TruncateMemo(TS);
+      try
+         ts.SaveToFile(FileName);
+      except
+      end;
+   end;
+
+   { Memo }
+   if FMemoLog <> nil then begin
+      ts.Clear;
+      ts.Assign(FMemoLog.Lines);
+      TruncateMemo(TS);
+      FMemoLog.Clear;
+      FMemoLog.Lines.Assign(ts);
+   end;
+   ts.Free;
+end;
+
+procedure TFileMemoLog.AddFile(const FileName: string; TabCount: Integer);
+var
+   F: TextFile;
+   s: string;
+begin
+   if FileExists(FileName) then begin
+      AssignFile(F, FileName);
+      System.Reset (F);
+      while not EOF(F) do begin
+         ReadLn (F, S);
+         LogString[tlsInfo, TabCount] := s;
+      end;
+      CloseFile (F);
+   end;
+end;
+
+function TFileMemoLog.GetLogSave(Filename: string): TStringList;
+var
+   TSIn : TStringList;
+   ProcessEnd : Boolean;
+   IB, IE, I, J, IP : Integer;
+   Ch : string;
+
+begin
+   FLogSave.Clear;
+   if FileExists(FileName) then begin
+      TSIn := TStringList.Create;
+      TSIn.LoadFromFile (FileName);
+      if TSIn.Count > 0 then begin
+         I  := 0;
+         IB := 0;
+         IP := 0;
+         Ch := ExtractWordNew (4, TSIn.Strings[i], [' ']);
+         ProcessEnd := False;
+         while not ProcessEnd do begin
+            if Ch = StlsBegin then begin
+               if IB < I then begin
+                  { нет символа конца }
+                  Ch := StlsEnd;
+                  Dec(I);
+                  end
+               else begin
+                  IB := I;
+                  IP := 0;
+               end;
+            end;
+            if Ch = StlsEnd then begin
+               if (i < TSIn.Count) then
+                  IE := I
+               else begin
+                  IE := I - 1;
+                  ProcessEnd := True;
+               end;
+               { Copy strings }
+               if IP > 0 then for J:=IB to IE do FLogSave.Add(TSIn.Strings[J]);
+               IB := IE + 1;
+            end;
+            if Ch = StlsError   then Inc(IP);
+            if Ch = StlsWarning then Inc(IP);
+            if Ch = StlsProcess then Inc(IP);
+            { Next string }
+            Inc(I);
+            if (i < TSIn.Count) then Ch := ExtractWordNew (4,  TSIn.Strings[i], [' '])
+                                else Ch := StlsEnd;
+         end;
+      end;
+      TSIn.Free;
+   end;
+   Result := FLogSave;
+end;
+
+function TFileMemoLog.GetLogSaveCurrent: TStringList;
+begin
+   Result := LogSave[Filename];
+end;
+
+{ This procedure is used to register this component on the component palette }
+
+procedure Register;
+begin
+   { CDO Libbrary }
+   RegisterComponents('Luis', [TFileMemoLog]);
+end;
+
+end.

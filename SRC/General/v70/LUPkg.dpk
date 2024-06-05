@@ -1,0 +1,49 @@
+package LUPkg;
+
+{$R *.res}
+{$R 'LUCal.dcr'}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO ON}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO OFF}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST ON}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $600000}
+{$DESCRIPTION 'Luis Components'}
+{$IMPLICITBUILD ON}
+
+requires
+  vcl,
+  vcldb,
+  RtmRxCtl7,
+  dclaxserver,
+  dclstd,
+  luPackage;
+
+contains
+  LUTreeView in 'LUTreeView.pas',
+  LUSupport in 'LUSupport.pas',
+  LUParser in 'LUParser.pas',
+  LULog in 'LULog.pas',
+  LUScanDir in 'LUScanDir.pas',
+  LUSheduler in 'LUSheduler.pas',
+  LUObjects in 'LUObjects.pas',
+  LULogView in 'LULogView.pas' {FormLog},
+  LUCal in 'LUCal.pas',
+  ImageComboBox in 'IMAGECOMBOBOX.PAS';
+
+end.
